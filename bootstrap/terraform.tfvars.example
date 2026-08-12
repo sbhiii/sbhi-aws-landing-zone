@@ -1,0 +1,11 @@
+# Copy to terraform.tfvars and fill in.
+# terraform.tfvars is gitignored; this example is not.
+
+# S3 bucket holding Terraform state. Must be globally unique.
+bucket_name = "example-management-tfstate"
+
+# Guard rail: apply fails if the caller is not this account.
+management_account_id = "000000000000"
+
+# Optional, defaults to eu-west-1.
+# region = "eu-west-1"
