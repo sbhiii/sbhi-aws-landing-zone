@@ -52,3 +52,12 @@ resource "aws_organizations_organizational_unit" "sandbox" {
     "Environment" : "Sandbox"
   }
 }
+
+# Suspended
+resource "aws_organizations_organizational_unit" "suspended" {
+  name      = "Suspended"
+  parent_id = aws_organizations_organization.organization.roots[0].id
+  tags = {
+    "Environment" : "Suspended"
+  }
+}
