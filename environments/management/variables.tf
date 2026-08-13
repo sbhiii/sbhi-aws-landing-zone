@@ -11,13 +11,17 @@ variable "management_account_id" {
   type        = string
 }
 
-
 ## Accounts
 
-# sahred-services
+# shared-services
 
 variable "shared_services_email" {
   description = "email of the AWS shared account"
   type        = string
 }
 
+## Identity center
+variable "admin_email" {
+  description = "email of the IAM Identity Center admin user"
+  type        = string
+}

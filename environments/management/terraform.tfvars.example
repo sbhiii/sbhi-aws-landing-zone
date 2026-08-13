@@ -15,3 +15,9 @@ management_account_id = "000000000000"
 # accounts and not already used to sign up anywhere. Changing it after creation
 # replaces the account, so prefer an alias you control (e.g. a distribution list).
 shared_services_email = "aws-shared-services@example.com"
+
+## Identity Center
+
+# Email of the Identity Center admin user. Receives the password-setup
+# invitation and any MFA recovery mail.
+admin_email = "you@example.com"
