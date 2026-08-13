@@ -25,6 +25,19 @@ What that means in practice is set out in [Security](docs/security.md): what is
 published, what is deliberately kept out of the repository, and why the
 distinction falls where it does.
 
+## AI assistance
+
+Parts of this repository are written with AI assistance, including Terraform
+configuration, documentation and commit messages. Everything is reviewed before
+it lands: plans are read, changes are applied by hand against a real AWS
+organization, and output is corrected or rewritten where it is wrong or where a
+different approach is better.
+
+This is disclosed for the same reason the rest is public. A reader should be able
+to judge the work knowing how it was produced. Using a tool does not transfer
+responsibility: the decisions recorded in [Decisions](docs/decisions.md) are
+deliberate ones, and any mistake here belongs to the author rather than the tool.
+
 ## Documentation
 
 | Document | What it covers |
