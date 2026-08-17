@@ -5,7 +5,9 @@
 - Terraform `~> 1.15`
 - AWS CLI v2
 - An AWS account to act as the organization management account
-- A domain capable of receiving mail at a unique address per AWS account
+- A unique email address per AWS account, reachable from outside this
+  organization
+  ([decision 11](decisions.md#11-the-account-root-email-domain-lives-outside-the-organization))
 
 ## Order of operations
 
