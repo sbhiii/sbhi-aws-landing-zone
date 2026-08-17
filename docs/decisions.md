@@ -144,3 +144,131 @@ the UK Ministry of Justice's practice of building in the open.
 **Consequences:** account IDs, root emails and the admin email stay in gitignored
 `terraform.tfvars`, with shapes documented in `terraform.tfvars.example`. State is
 never committed. See [Security](security.md#what-is-published-and-what-is-not).
+
+## 11. The account root email domain lives outside the organization
+
+**Rule: what recovers you must not depend on what it recovers.**
+
+The domain that receives AWS account root email is registered and resolved
+outside AWS, with mailboxes at an external provider. None of it is managed here.
+
+Root email is the recovery path when Identity Center is unavailable. Put that
+domain inside the organization and a suspension or a billing failure takes out
+the recovery path at the exact moment it is needed: you would have to receive the
+mail in order to regain the access required to fix the mail.
+`aws_route53domains_domain` can register a domain, so this is a deliberate choice
+rather than a provider limitation.
+
+The rule applies upward too. The registrar, DNS and mail accounts must not use
+recovery addresses at this domain, which would reintroduce the same loop one
+level up.
+
+**Registrar and DNS are at one provider, not two.** Splitting them looks like
+defence in depth and is not: either account alone is enough for a full takeover,
+by repointing the nameservers or by rewriting the MX records. A split doubles the
+accounts to harden and buys no resistance to compromise. The accepted cost is
+that a provider-level suspension takes out registration and DNS together.
+
+**Consequences:** those external accounts are part of this landing zone's
+security boundary despite appearing nowhere in this repository, and they warrant
+stronger authentication than the AWS accounts they protect. Domain expiry, a
+failed card, or a lapsed mail subscription each break account recovery silently.
+The procedure is in [the lost access runbook](runbooks/lost-access.md).
+
+## 12. Automation never gets write access to mail records
+
+**Rule: a credential that can write DNS must not be able to change where mail
+goes.**
+
+MX records decide who receives mail. On the domain carrying AWS account root
+addresses that is the recovery path from
+[decision 11](#11-the-account-root-email-domain-lives-outside-the-organization);
+on a product domain it is customer and transactional mail. Either way, anything
+that writes DNS unattended (cert-manager solving ACME challenges, external-dns
+reconciling services, ACM validating a certificate) must be unable to touch them.
+
+There are two ways to enforce this, and which is available depends on the
+provider.
+
+**Zone separation.** Delegate a subdomain to its own hosted zone and scope the
+credential to that zone. The zone holds no mail records, so the credential cannot
+reach them however it is misused. This is the only option where the provider
+scopes credentials per zone rather than per record, which is the case for the
+external provider holding the apex: a token able to write challenge records under
+a subdomain can also rewrite the apex MX.
+
+**Record-level IAM conditions.** Route 53 supports
+`route53:ChangeResourceRecordSetsNormalizedRecordNames`,
+`ChangeResourceRecordSetsRecordTypes` and `ChangeResourceRecordSetsActions`. A
+role can be allowed to UPSERT TXT records named `_acme-challenge.*` and nothing
+else, in a zone that also holds MX. Mail and automation can share a zone safely.
+
+**Which applies where.** Zone separation is structural: a separate zone cannot be
+re-opened by a typo. Record-level conditions are a policy control, and a policy
+widened during debugging removes the protection with nothing to announce it.
+
+So the choice follows the blast radius. The domain carrying AWS account recovery
+mail gets zone separation, because the downside is losing the organization. A
+product domain gets record-level conditions, because the downside is losing
+product mail and the operational gain is real: the whole zone can live in Route
+53, with apex ALIAS records to CloudFront and load balancers and certificate
+validation in the same apply.
+
+**The rule that follows for the hand-managed apex zone:** no API token is ever
+issued for it. Wanting to automate it is the signal to revisit this decision, not
+to mint the token.
+
+**Consequences:** a certificate for a name in that apex zone needs its validation
+record added by hand. That is one record per name rather than an ongoing chore,
+since ACM reuses the same record across renewals. Apex ALIAS records are not
+available there either, and the provider's CNAME flattening covers the same need.
+
+**Not built yet:** when AWS workload accounts need DNS under the personal domain,
+a single subdomain is delegated to a hub zone in `sbhi-shared-services` which
+re-delegates per account, so that adding an account stays a Terraform change
+rather than a manual edit at the provider. One delegation does not justify the
+extra zone and the extra resolution hop. Workloads that run outside AWS take a
+top-level delegation instead and do not sit under that hub.
+
+## 13. Domains are registered where they outlive what they serve
+
+**Rule: registration belongs to the longest-lived thing, not to the workload it
+currently points at.**
+
+The domain carrying account root email is registered at an external registrar,
+outside the organization, for the reasons in
+[decision 11](#11-the-account-root-email-domain-lives-outside-the-organization).
+Every other domain is registered in Route 53 in `sbhi-shared-services`.
+
+**Not the workload account.** A domain is a business asset that outlives the
+infrastructure serving it: products get rebuilt and accounts get closed, but the
+name persists through both. Closing an AWS account begins a 90-day suspension, so
+a registration held there is not merely awkward to recover. The workload account
+is also the most exposed one, since it runs the code and holds the deploy role,
+and a compromise there must not be able to transfer the domain away.
+
+**Not the management account,** for the usual reason: service control policies do
+not apply to it, so nothing placed there can ever be constrained.
+
+**Not the external registrar,** despite decision 11 putting the root email domain
+there. That registrar requires a domain's DNS to be on its own platform, and
+product domains want their zone in Route 53 so that apex ALIAS records and
+in-apply certificate validation work, per
+[decision 12](#12-automation-never-gets-write-access-to-mail-records). Registering
+at yet another registrar would re-add a party that was deliberately removed.
+
+**Consequences:** registration and hosted zone deliberately live in different
+accounts. Registration is a durable, organization-level asset; the hosted zone is
+an operational resource belonging to the product, so it sits in the workload
+account alongside the records it serves. The registered domain's nameservers
+point at that zone. If the workload account is closed or rebuilt, the
+registration survives and the nameservers are repointed at the new zone.
+
+`aws_route53domains_domain` spends money on `apply` and a registration cannot be
+reversed on a whim, so it carries `prevent_destroy` for the same reasons as
+[decision 3](#3-member-accounts-are-protected-from-destruction).
+`aws_route53domains_registered_domain` is the resource for a domain registered
+elsewhere, and its `name_server` block is what points registration at the zone.
+
+Route 53 registration costs a few dollars a year more than an at-cost registrar.
+That is the price of not adding a party, and it is not worth optimising.

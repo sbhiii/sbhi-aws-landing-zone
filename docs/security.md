@@ -19,21 +19,22 @@ Standard's requirement to make new source code open.
 ## What is published, and what is not
 
 Being open about architecture is not the same as being careless with
-identifiers. The line falls at things that are *useful to an attacker but not to
-a reader*.
+identifiers. The line falls at things that are _useful to an attacker but not to
+a reader_.
 
 **Published:** the full Terraform configuration, OU structure, permission sets,
 guard rails, decisions and their reasoning, and the recovery runbooks.
 
 **Not published**, kept in gitignored `terraform.tfvars`:
 
-| Value | Why it is withheld |
-| --- | --- |
-| Account root email addresses | The account-recovery surface. Publishing them invites targeted phishing aimed at password reset. |
-| AWS account IDs | Not secret per AWS, but useful for social engineering against support and for targeting cross-account trust policies. |
-| Identity Center admin email | The MFA and password recovery path. |
+| Value                                                                      | Why it is withheld                                                                                                                                                                                                                                                                                         |
+| -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Account root email addresses                                               | The account-recovery surface. Publishing them invites targeted phishing aimed at password reset.                                                                                                                                                                                                           |
+| AWS account IDs                                                            | Not secret per AWS, but useful for social engineering against support and for targeting cross-account trust policies.                                                                                                                                                                                      |
+| Identity Center admin email                                                | The MFA and password recovery path.                                                                                                                                                                                                                                                                        |
+| The root email domain, and the registrar, DNS and mail providers behind it | Names the external accounts whose compromise would yield the whole organization. The arrangement is documented in [decision 11](decisions.md#11-the-account-root-email-domain-lives-outside-the-organization); the vendor names add nothing for a reader and only help someone assembling a phishing list. |
 
-Every variable is documented in `terraform.tfvars.example`, so the *shape* of the
+Every variable is documented in `terraform.tfvars.example`, so the _shape_ of the
 required input is public even where the values are not. A reader can reproduce
 the landing zone without learning anything that helps them attack this one.
 
@@ -72,6 +73,13 @@ so that removal from state never closes a real account.
 management, Identity Center, and Terraform state. Workloads live in member
 accounts.
 
+**DNS write access cannot reach mail records.** Automation that writes DNS is
+either scoped to a hosted zone containing no mail records, or restricted by Route
+53 record-level IAM conditions to the exact names and types it needs. The apex
+zone carrying account recovery mail holds no automation credential at all and is
+edited by hand. See
+[decision 12](decisions.md#12-automation-never-gets-write-access-to-mail-records).
+
 ## Known gaps
 
 These are real, current weaknesses. They are listed rather than omitted, because
@@ -79,7 +87,7 @@ a security document that only describes strengths is marketing.
 
 **No service control policies.** `SERVICE_CONTROL_POLICY` is enabled on the
 organization and the OU structure exists, but no policies are attached. Nothing
-is currently *enforced* at the organization level: `Suspended` does not deny,
+is currently _enforced_ at the organization level: `Suspended` does not deny,
 `Sandbox` does not restrict, and no policy prevents leaving the organization,
 disabling CloudTrail, or creating IAM users. This is the highest-priority gap.
 
@@ -93,7 +101,15 @@ pipeline running `fmt`, `validate`, or policy scanning on pull requests, and no
 enforced plan-before-merge.
 
 **Single administrator, single MFA device.** One human, one Identity Center user,
-one registered device. The recovery path if that device is lost is the root user.
+one registered device. The recovery path if that device is lost is the root user,
+and there is no IAM user fallback in between: the original one was deliberately
+removed. Root recovery in turn depends on email delivered through an external
+registrar, DNS provider and mail provider, none of which are managed by this
+repository. Compromise of any of those three accounts is equivalent to compromise
+of the organization, and a lapse in any of them breaks recovery silently. The
+chain is set out in
+[Architecture](architecture.md#dns-and-external-dependencies) and the procedure in
+[the lost access runbook](runbooks/lost-access.md).
 
 ## Reporting a problem
 

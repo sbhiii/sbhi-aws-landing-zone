@@ -122,6 +122,48 @@ instance profiles, task roles, execution roles, Pod Identity, or OIDC federation
 for anything running outside AWS. See
 [Decisions](decisions.md#5-applications-use-iam-roles-not-users).
 
+## DNS and external dependencies
+
+Part of this landing zone's trust chain sits outside AWS and outside this
+repository. It is recorded here because no amount of reading the Terraform will
+reveal it.
+
+```
+registrar  →  DNS  →  mailbox  →  account root  →  the organization
+```
+
+Account root email is the recovery path when Identity Center is unavailable, and
+it is delivered through an external registrar, DNS provider and mail provider.
+Compromise or loss of any link is equivalent to compromise or loss of the
+organization, so those accounts are part of the security boundary. See
+[decision 11](decisions.md#11-the-account-root-email-domain-lives-outside-the-organization).
+
+### Zone layout
+
+```
+example.com                apex zone, external DNS provider, edited by hand
+  MX SPF DKIM DMARC        external mail provider
+  www                      public site, manual record
+  homelab    NS ───────→   Route 53 hosted zone in sbhi-shared-services
+                             cert-manager writes ACME challenge records here
+                             IAM role scoped to this hosted zone only
+```
+
+Automation never writes into the apex zone, which carries the MX records for
+account recovery. See
+[decision 12](decisions.md#12-automation-never-gets-write-access-to-mail-records).
+
+The homelab cluster runs outside AWS on hardware that is not part of this
+organization. Its entire AWS footprint is three resources: the hosted zone, an
+IAM OIDC provider registered for the cluster's service account issuer, and the
+role cert-manager assumes. All three live in `sbhi-shared-services`, because IAM
+OIDC providers are account-scoped and the role must be created alongside the zone
+it is scoped to. The trust policy pins both `aud` and `sub`, so only the named
+service account can assume the role rather than any pod in the cluster.
+
+A dedicated workload account becomes worthwhile when the cluster starts consuming
+AWS services rather than only writing DNS.
+
 ## What Terraform does not manage
 
 Some parts of this landing zone have no Terraform resource and are applied by
