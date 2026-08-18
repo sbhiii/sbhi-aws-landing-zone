@@ -144,7 +144,7 @@ organization, so those accounts are part of the security boundary. See
 example.com                apex zone, external DNS provider, edited by hand
   MX SPF DKIM DMARC        external mail provider
   www                      public site, manual record
-  homelab    NS ───────→   Route 53 hosted zone in sbhi-shared-services
+  homelab    NS ───────→   Route 53 hosted zone in sbhi-shared-services (planned)
                              cert-manager writes ACME challenge records here
                              IAM role scoped to this hosted zone only
 ```
@@ -153,13 +153,21 @@ Automation never writes into the apex zone, which carries the MX records for
 account recovery. See
 [decision 12](decisions.md#12-automation-never-gets-write-access-to-mail-records).
 
-The homelab cluster runs outside AWS on hardware that is not part of this
-organization. Its entire AWS footprint is three resources: the hosted zone, an
-IAM OIDC provider registered for the cluster's service account issuer, and the
-role cert-manager assumes. All three live in `sbhi-shared-services`, because IAM
-OIDC providers are account-scoped and the role must be created alongside the zone
-it is scoped to. The trust policy pins both `aud` and `sub`, so only the named
-service account can assume the role rather than any pod in the cluster.
+**Not built yet.** The homelab cluster runs outside AWS on hardware that is not
+part of this organization, and needs DNS it can write to plus an identity AWS
+will trust. That footprint is the hosted zone, an IAM OIDC provider registered
+for the cluster's service account issuer, the role cert-manager assumes, and the
+certificate, bucket and distribution serving the issuer's discovery documents. It
+belongs in `sbhi-shared-services`, because IAM OIDC providers are account-scoped
+and the role must be created alongside the zone it is scoped to. The trust policy
+pins both `aud` and `sub`, so only the named service account can assume the role
+rather than any pod in the cluster.
+
+None of it exists in `sbhi-shared-services` today. An earlier deployment of the
+cluster created these resources in the management account instead, which is the
+arrangement this section describes replacing. The ownership split between this
+repository and the cluster's own repository is in
+[decision 14](decisions.md#14-the-landing-zone-owns-what-outlives-the-workload).
 
 A dedicated workload account becomes worthwhile when the cluster starts consuming
 AWS services rather than only writing DNS.

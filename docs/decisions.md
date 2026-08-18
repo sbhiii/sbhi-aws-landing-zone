@@ -272,3 +272,43 @@ elsewhere, and its `name_server` block is what points registration at the zone.
 
 Route 53 registration costs a few dollars a year more than an at-cost registrar.
 That is the price of not adding a party, and it is not worth optimising.
+
+## 14. The landing zone owns what outlives the workload
+
+**Rule: a resource whose destruction requires a manual edit outside AWS belongs
+to this repository. Everything that follows the workload's own lifecycle belongs
+to the workload's repository.**
+
+**Not built yet:** the arrangement below is decided and not deployed. It is
+recorded now because it constrains how `environments/shared-services/` is
+written. See
+[Architecture](architecture.md#dns-and-external-dependencies).
+
+The homelab cluster's AWS footprint belongs in `sbhi-shared-services`, with only
+the hosted zone defined here. The OIDC provider, the role, the discovery
+documents and the records pointing at the cluster are defined in the cluster's
+own repository.
+
+**Why the split falls there.** The zone anchors a delegation edited by hand at
+the external DNS provider, per
+[decision 12](#12-automation-never-gets-write-access-to-mail-records). Destroy it
+and the replacement gets a new zone ID, so recovery is a manual edit at the
+provider rather than an apply. Everything else is derived from the cluster's
+signing key or points at its current address, so it is recreated whenever the
+cluster is. A node rebuild must not require an apply in this repository.
+
+**Why not a dedicated workload account.** The cluster only writes DNS. It holds
+no data and runs no AWS compute, so an account would add a boundary with nothing
+on either side of it, plus a state backend, a profile and an assignment to
+maintain. It also takes a top-level delegation rather than sitting under the hub
+zone in [decision 12](#12-automation-never-gets-write-access-to-mail-records),
+since that hub exists to save manual edits when vending AWS accounts and a
+workload outside AWS is not vended. Revisit when the cluster starts consuming AWS
+services rather than only writing DNS.
+
+**How the boundary is crossed.** The workload repository reads the zone with a
+`data "aws_route53_zone"` lookup by name, not `terraform_remote_state`. A name is
+a stable contract; a state file is an implementation detail, and sharing one
+would let a failed apply in either repository block the other. Both repositories
+write into the same account, which is what the `Repository` tag in
+[naming and tagging](naming-and-tagging.md#tagging) exists to disambiguate.
