@@ -1,0 +1,18 @@
+# Copy to terraform.tfvars and fill in.
+# terraform.tfvars is gitignored; this example is not.
+
+## Common
+
+# Guard rail: apply fails if the caller is not this account.
+shared_services_account_id = "000000000000"
+
+# Optional, defaults to eu-west-1.
+# region = "eu-west-1"
+
+## DNS
+
+# Subdomain delegated from the apex zone at the external DNS provider, for the
+# homelab cluster. The apex is edited by hand and holds the account recovery MX
+# records, so only this subdomain is delegated into AWS. Records inside the zone
+# are managed by the cluster's own repository, not here.
+homelab_zone_name = "homelab.example.com"
