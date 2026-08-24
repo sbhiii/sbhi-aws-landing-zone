@@ -29,10 +29,24 @@ guard rails, decisions and their reasoning, and the recovery runbooks.
 
 | Value                                                                      | Why it is withheld                                                                                                                                                                                                                                                                                         |
 | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Account root email addresses                                               | The account-recovery surface. Publishing them invites targeted phishing aimed at password reset.                                                                                                                                                                                                           |
-| AWS account IDs                                                            | Not secret per AWS, but useful for social engineering against support and for targeting cross-account trust policies.                                                                                                                                                                                      |
-| Identity Center admin email                                                | The MFA and password recovery path.                                                                                                                                                                                                                                                                        |
-| The root email domain, and the registrar, DNS and mail providers behind it | Names the external accounts whose compromise would yield the whole organization. The arrangement is documented in [decision 11](decisions.md#11-the-account-root-email-domain-lives-outside-the-organization); the vendor names add nothing for a reader and only help someone assembling a phishing list. |
+| Account root email addresses | Not handed over, but see below: they are derivable, so this is hygiene rather than a control. |
+| AWS account IDs | Not secret per AWS, but useful for social engineering against support and for targeting cross-account trust policies. |
+| Identity Center admin email | Same as the row above. Withheld, and derivable by the same route. |
+
+The root email domain is not withheld. It fronts a public site, and `dig NS` and
+`dig MX` name its providers to anyone who knows it.
+
+Root addresses are therefore derivable: the aliasing subdomain is confirmed by
+`dig MX`, and [naming and tagging](naming-and-tagging.md#aws-accounts) publishes
+the convention `sbhi-<purpose>@<domain>`. They are kept out of this repository
+anyway, but the protection is MFA on the mailbox and on Identity Center, plus
+`RootCredentialsManagement`, not secrecy.
+
+[Decision 11](decisions.md#11-the-account-root-email-domain-lives-outside-the-organization)
+is unaffected. Its protection is structural, not informational.
+
+**Not built yet:** root email on a domain unrelated to the public one would make
+the addresses underivable. That is a change to live accounts.
 
 Every variable is documented in `terraform.tfvars.example`, so the _shape_ of the
 required input is public even where the values are not. A reader can reproduce
