@@ -13,6 +13,15 @@ configuration, running `fmt` and `validate`, and reading state are fine.
 Identity Center instance ARNs or identity store IDs. They belong in gitignored
 `terraform.tfvars`, with the shape documented in `terraform.tfvars.example`.
 
+This rule is scoped to **this** repository, which manages the organization
+itself. It is deliberately stricter than industry practice: AWS does not treat
+account IDs as secret, and workload repositories elsewhere in this estate commit
+role ARNs, account ID included, because the protection there is the trust
+policy's conditions rather than the obscurity of the identifier. Do not carry
+this rule into those repositories. Applying it to `sre-homelab-gitops` once cost
+an unscopeable IAM permission and a manual step on every cluster rebuild, to
+conceal a member account ID that AWS publishes in error messages anyway.
+
 **`bootstrap/` keeps local state and is applied by hand.** This is deliberate and
 settled: see [decision 1](docs/decisions.md#1-bootstrap-state-is-local-and-manual).
 Do not propose migrating it to S3 or wiring it into CI. The GitHub OIDC provider

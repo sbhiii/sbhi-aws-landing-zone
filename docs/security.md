@@ -30,8 +30,25 @@ guard rails, decisions and their reasoning, and the recovery runbooks.
 | Value                                                                      | Why it is withheld                                                                                                                                                                                                                                                                                         |
 | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Account root email addresses | Not handed over, but see below: they are derivable, so this is hygiene rather than a control. |
-| AWS account IDs | Not secret per AWS, but useful for social engineering against support and for targeting cross-account trust policies. |
+| AWS account IDs | Not secret per AWS, but useful for social engineering against support and for targeting cross-account trust policies. Withheld **here**, where the management account ID would be exposed; see below. |
 | Identity Center admin email | Same as the row above. Withheld, and derivable by the same route. |
+
+### Withholding account IDs is scoped to this repository
+
+Workload repositories in this estate commit role ARNs, account ID included. That
+is deliberate and it is the industry norm: AWS does not classify account IDs as
+secret, and a role is protected by the conditions on its trust policy, not by the
+obscurity of its ARN.
+
+The rule holds here because this repository manages the organization, so an
+account ID committed here is the management account's. That one is worth
+withholding: service control policies do not apply to it, and it can create and
+close accounts.
+
+Enforcing it outside that boundary has a measured cost. Doing so in
+`sre-homelab-gitops` required an unscopeable `route53:ListHostedZonesByName` on
+the cert-manager role, and a manual step after every cluster rebuild, to conceal
+a member account ID. Both were reverted.
 
 The root email domain is not withheld. It fronts a public site, and `dig NS` and
 `dig MX` name its providers to anyone who knows it.
