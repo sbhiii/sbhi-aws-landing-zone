@@ -35,15 +35,3 @@ resource "aws_route53domains_registered_domain" "unserved" {
   auto_renew    = each.value.auto_renew
   transfer_lock = each.value.transfer_lock
 }
-
-import {
-  for_each = var.mail_zones
-  to       = aws_route53domains_registered_domain.mail[each.key]
-  id       = each.key
-}
-
-import {
-  for_each = var.unserved_domains
-  to       = aws_route53domains_registered_domain.unserved[each.key]
-  id       = each.key
-}
