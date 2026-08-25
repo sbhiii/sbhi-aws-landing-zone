@@ -28,9 +28,19 @@ homelab_zone_name = "homelab.example.com"
 # old one is still serving. See the migration procedure in the runbooks.
 #
 # ttl defaults to 60 and txt to an empty list.
+# auto_renew defaults to true and transfer_lock to false. Set auto_renew
+# explicitly on anything you intend to keep: it is the setting that fails
+# silently, a year later, on a date nobody is watching.
 mail_zones = {
   "example.com" = {
-    mx  = ["10 mx1.mail.example.net", "20 mx2.mail.example.net"]
-    txt = ["provider-verification=replace-me"]
+    mx            = ["10 mx1.mail.example.net", "20 mx2.mail.example.net"]
+    txt           = ["provider-verification=replace-me"]
+    transfer_lock = true
   }
+}
+
+# Domains registered here with no hosted zone here. Their nameservers are left
+# unmanaged, because there is nothing in this account to point them at.
+unserved_domains = {
+  "example.net" = { auto_renew = false, transfer_lock = false }
 }
