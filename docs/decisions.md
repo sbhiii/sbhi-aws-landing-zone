@@ -308,3 +308,49 @@ a stable contract; a state file is an implementation detail, and sharing one
 would let a failed apply in either repository block the other. Both repositories
 write into the same account, which is what the `Repository` tag in
 [naming and tagging](naming-and-tagging.md#tagging) exists to disambiguate.
+
+## 15. State follows the repository that writes it, not the account it describes
+
+**Rule: every root module in this repository keeps its state in the management
+account, whichever account it targets. Workload repositories keep their own state
+beside their own resources.**
+
+`environments/shared-services/` creates resources in `sbhi-shared-services` but
+stores state in `sbhi-management-tfstate`. The provider authenticates as shared
+services; the backend authenticates as the management account through an explicit
+`profile` in `backend.tf`, because the bucket policy grants shared services
+nothing.
+
+**Why one bucket.** `bootstrap/` already hardens it properly: versioning, SSE,
+`BucketOwnerEnforced`, a policy denying every non-TLS request, and
+`prevent_destroy`. Reproducing that per account is work with no benefit at two
+accounts. Worse, a bucket in `sbhi-shared-services` needs its own bootstrap with
+local state, which reopens [decision 1](#1-bootstrap-state-is-local-and-manual) in
+a second place. That decision frames local state as one deliberate exception; two
+exceptions is a pattern, and a worse one.
+
+**Alternative considered:** a bucket policy granting `sbhi-shared-services` access
+to the `shared-services/*` prefix. It needs no `profile` and would survive CI
+unchanged.
+
+**Why rejected:** it permanently widens access to the bucket holding the most
+sensitive state in the organization, in order to pre-solve a problem that does not
+exist until CI does. The `profile` line adds no cross-account grant at all.
+
+**The known cost.** That `profile` will break under CI, where runners hold OIDC
+role credentials rather than named profiles. Its arrival is the trigger to revisit
+this, along with roughly four or five accounts, at which point "state for account
+X lives in account X" starts paying for its own bootstrap.
+
+**The exception, and it is the important half.** Workload state does not follow
+this rule. The homelab repository keeps its state in its own bucket in
+`sbhi-shared-services`, because that state contains the cluster's ServiceAccount
+signing private key. Anyone holding that key can forge a token for any service
+account in the cluster and assume the role it is trusted for. Putting it in the
+management account would mean a compromise there yields the cluster's identity,
+and a compromise of the cluster reaches into the account that manages the
+organization.
+
+Landing zone state and workload state have different sensitivity and different
+blast radius. Centralising is right for one and wrong for the other, and the
+instinct to make it uniform is the thing to resist.
