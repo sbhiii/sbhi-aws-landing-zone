@@ -279,15 +279,11 @@ That is the price of not adding a party, and it is not worth optimising.
 to this repository. Everything that follows the workload's own lifecycle belongs
 to the workload's repository.**
 
-**Not built yet:** the arrangement below is decided and not deployed. It is
-recorded now because it constrains how `environments/shared-services/` is
-written. See
-[Architecture](architecture.md#dns-and-external-dependencies).
-
-The homelab cluster's AWS footprint belongs in `sbhi-shared-services`, with only
+The homelab cluster's AWS footprint lives in `sbhi-shared-services`, with only
 the hosted zone defined here. The OIDC provider, the role, the discovery
 documents and the records pointing at the cluster are defined in the cluster's
-own repository.
+own repository. See
+[Architecture](architecture.md#workloads-outside-aws).
 
 **Why the split falls there.** The zone anchors a delegation edited by hand at
 the external DNS provider, per
