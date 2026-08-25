@@ -16,3 +16,21 @@ shared_services_account_id = "000000000000"
 # records, so only this subdomain is delegated into AWS. Records inside the zone
 # are managed by the cluster's own repository, not here.
 homelab_zone_name = "homelab.example.com"
+
+## Mail zones
+
+# Apex zones for domains registered in this account, per decision 13. Mail
+# records only: nothing automated ever writes into these.
+#
+# Adding an entry creates a zone but changes nothing about resolution. The zone
+# is inert until the registration's nameservers are repointed at its delegation
+# set, which is deliberate: it lets a new zone be built and verified while the
+# old one is still serving. See the migration procedure in the runbooks.
+#
+# ttl defaults to 60 and txt to an empty list.
+mail_zones = {
+  "example.com" = {
+    mx  = ["10 mx1.mail.example.net", "20 mx2.mail.example.net"]
+    txt = ["provider-verification=replace-me"]
+  }
+}
