@@ -47,7 +47,7 @@ reversible than closing it, and account closure cannot be undone on demand.
 | Account | OU | Purpose |
 | --- | --- | --- |
 | management | Root | Organization management, Identity Center, Terraform state. |
-| sbhi-shared-services | Infrastructure | Shared infrastructure across workloads. |
+| sbhi-shared-services | Infrastructure | Shared infrastructure across workloads. Currently the hosted zone delegated to the homelab cluster, and the identity and discovery resources that cluster's own repository defines alongside it. |
 
 The management account is kept as empty as possible. It can create accounts,
 edit service control policies, and administer Identity Center, so anything
@@ -144,7 +144,7 @@ organization, so those accounts are part of the security boundary. See
 example.com                apex zone, external DNS provider, edited by hand
   MX SPF DKIM DMARC        external mail provider
   www                      public site, manual record
-  homelab    NS ───────→   Route 53 hosted zone in sbhi-shared-services (planned)
+  homelab    NS ───────→   Route 53 hosted zone in sbhi-shared-services
                              cert-manager writes ACME challenge records here
                              IAM role scoped to this hosted zone only
 ```
@@ -153,24 +153,43 @@ Automation never writes into the apex zone, which carries the MX records for
 account recovery. See
 [decision 12](decisions.md#12-automation-never-gets-write-access-to-mail-records).
 
-**Not built yet.** The homelab cluster runs outside AWS on hardware that is not
-part of this organization, and needs DNS it can write to plus an identity AWS
-will trust. That footprint is the hosted zone, an IAM OIDC provider registered
-for the cluster's service account issuer, the role cert-manager assumes, and the
-certificate, bucket and distribution serving the issuer's discovery documents. It
-belongs in `sbhi-shared-services`, because IAM OIDC providers are account-scoped
-and the role must be created alongside the zone it is scoped to. The trust policy
-pins both `aud` and `sub`, so only the named service account can assume the role
-rather than any pod in the cluster.
+## Workloads outside AWS
 
-None of it exists in `sbhi-shared-services` today. An earlier deployment of the
-cluster created these resources in the management account instead, which is the
-arrangement this section describes replacing. The ownership split between this
-repository and the cluster's own repository is in
-[decision 14](decisions.md#14-the-landing-zone-owns-what-outlives-the-workload).
+A workload can run outside AWS and still need a small AWS footprint. The homelab
+cluster is the current instance: it runs on hardware that is not part of this
+organization, and needs DNS it can write to plus an identity AWS will trust.
 
-A dedicated workload account becomes worthwhile when the cluster starts consuming
-AWS services rather than only writing DNS.
+Its footprint lives in `sbhi-shared-services`, defined across two repositories:
+
+| Resource | Defined in | Why |
+| --- | --- | --- |
+| Hosted zone for the delegated subdomain | this repository | Anchors a delegation edited by hand at the external DNS provider. |
+| OIDC provider for the cluster's issuer | the workload's repository | Derived from the cluster's signing key. |
+| Role the cluster's workload assumes | the workload's repository | Scoped to the zone, trusted by that provider. |
+| Certificate, bucket and distribution publishing the discovery documents | the workload's repository | Recreated with the cluster's identity. |
+| Records pointing at the cluster | the workload's repository | Follow the cluster's current address. |
+
+The split is the rule in
+[decision 14](decisions.md#14-the-landing-zone-owns-what-outlives-the-workload):
+this repository owns what outlives the workload, the workload's repository owns
+what shares its lifecycle. The contract between them is the zone's name, resolved
+with a `data` source rather than shared through state.
+
+No credential is issued for any of it. The kubelet projects a service account
+token, the AWS SDK exchanges it through `AssumeRoleWithWebIdentity`, and the trust
+policy pins both `aud` and `sub`, so only the named service account can assume the
+role rather than any workload in the cluster. See
+[decision 5](decisions.md#5-applications-use-iam-roles-not-users).
+
+The signing key lives in the workload repository's Terraform state rather than on
+the node. A node rebuild therefore leaves the published discovery documents, the
+OIDC provider and the trust policy all valid, which has been exercised in
+practice rather than assumed.
+
+The footprint sits in `sbhi-shared-services` rather than a dedicated workload
+account because the cluster only writes DNS. A dedicated account becomes
+worthwhile once it consumes AWS services: holding data, running compute, or
+reaching anything whose blast radius is worth isolating.
 
 ## What Terraform does not manage
 
