@@ -72,7 +72,9 @@ suspension, closures are rate-limited, and the root email is effectively burned.
 
 ## State management
 
-Two root modules, two different state strategies.
+Three root modules. All state for this repository lives in the management
+account, whichever account a module targets: see
+[decision 15](decisions.md#15-state-follows-the-repository-that-writes-it-not-the-account-it-describes).
 
 **`bootstrap/`** creates the S3 bucket that holds all other state. Its own state
 is local and it is applied by hand. This is the one deliberate exception to
@@ -84,6 +86,16 @@ a bucket policy denying any non-TLS request.
 **`environments/management/`** uses the S3 backend with `use_lockfile = true`,
 S3-native conditional-write locking, which replaces the DynamoDB lock table that
 older setups used.
+
+**`environments/shared-services/`** uses the same bucket with its own key. Its
+provider authenticates as `sbhi-shared-services` while its backend authenticates
+as the management account through an explicit `profile`, because the bucket policy
+grants shared services nothing. That split is the only unusual thing in the
+configuration and decision 15 explains why it is there.
+
+Workload repositories do not follow this rule. Their state sits beside their own
+resources, for reasons that matter more than tidiness; decision 15 covers that
+too.
 
 ## Identity and access
 
