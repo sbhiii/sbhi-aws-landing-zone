@@ -20,6 +20,13 @@ variable "shared_services_email" {
   type        = string
 }
 
+# homelab
+
+variable "homelab_email" {
+  description = "email of the AWS homelab workload account"
+  type        = string
+}
+
 ## Identity center
 variable "admin_email" {
   description = "email of the IAM Identity Center admin user"

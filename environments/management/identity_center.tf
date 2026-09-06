@@ -7,6 +7,7 @@ locals {
   sso_accounts = {
     management      = var.management_account_id
     shared_services = aws_organizations_account.sbhi_shared_services.id
+    homelab         = aws_organizations_account.sbhi_homelab.id
   }
 }
 

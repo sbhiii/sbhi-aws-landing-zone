@@ -4,6 +4,28 @@ Each significant choice, the alternatives considered, and the reasoning. Recorde
 so that a future reader, including a future version of the author, can tell the
 difference between a deliberate decision and an accident.
 
+Nothing here is removed. A decision that no longer holds is marked in the table
+and keeps its entry, because the reasoning is the point.
+
+| # | Decision | Status |
+| --- | --- | --- |
+| 1 | [Bootstrap state is local and manual](#1-bootstrap-state-is-local-and-manual) | Current |
+| 2 | [S3 native locking, not DynamoDB](#2-s3-native-locking-not-dynamodb) | Current |
+| 3 | [Member accounts are protected from destruction](#3-member-accounts-are-protected-from-destruction) | Current |
+| 4 | [Human access through Identity Center, not IAM users](#4-human-access-through-identity-center-not-iam-users) | Current |
+| 5 | [Applications use IAM roles, not users](#5-applications-use-iam-roles-not-users) | Current |
+| 6 | [Access is assigned to groups, not users](#6-access-is-assigned-to-groups-not-users) | Current |
+| 7 | [Every provider declares allowed_account_ids](#7-every-provider-declares-allowed_account_ids) | Current |
+| 8 | [Single region: eu-west-1](#8-single-region-eu-west-1) | Current |
+| 9 | [Service control policies are not yet written](#9-service-control-policies-are-not-yet-written) | Current |
+| 10 | [The repository is public](#10-the-repository-is-public) | Current |
+| 11 | [The account root email domain lives outside the organization](#11-the-account-root-email-domain-lives-outside-the-organization) | Current |
+| 12 | [Automation never gets write access to mail records](#12-automation-never-gets-write-access-to-mail-records) | Current |
+| 13 | [Domains are registered where they outlive what they serve](#13-domains-are-registered-where-they-outlive-what-they-serve) | Current |
+| 14 | [The landing zone owns what outlives the workload](#14-the-landing-zone-owns-what-outlives-the-workload) | Revisited by [16](#16-the-homelab-cluster-has-its-own-workload-account) |
+| 15 | [State follows the repository that writes it, not the account it describes](#15-state-follows-the-repository-that-writes-it-not-the-account-it-describes) | Current |
+| 16 | [The homelab cluster has its own workload account](#16-the-homelab-cluster-has-its-own-workload-account) | Current |
+
 ## 1. Bootstrap state is local and manual
 
 `bootstrap/` creates the S3 bucket that holds all other Terraform state. Its own
@@ -275,6 +297,9 @@ That is the price of not adding a party, and it is not worth optimising.
 
 ## 14. The landing zone owns what outlives the workload
 
+*Revisited by [decision 16](#16-the-homelab-cluster-has-its-own-workload-account): the
+cluster now consumes an AWS service beyond DNS, and has its own account.*
+
 **Rule: a resource whose destruction requires a manual edit outside AWS belongs
 to this repository. Everything that follows the workload's own lifecycle belongs
 to the workload's repository.**
@@ -354,3 +379,42 @@ organization.
 Landing zone state and workload state have different sensitivity and different
 blast radius. Centralising is right for one and wrong for the other, and the
 instinct to make it uniform is the thing to resist.
+
+## 16. The homelab cluster has its own workload account
+
+**Rule: AWS services the cluster consumes at runtime live in `sbhi-homelab`. The
+hosted zone and the DNS role stay in `sbhi-shared-services`.**
+
+[Decision 14](#14-the-landing-zone-owns-what-outlives-the-workload) declined a
+dedicated account while the cluster only wrote DNS, and set the condition for
+changing that: revisit when it starts consuming AWS services. SSM Parameter
+Store, read by External Secrets Operator, is the first. The account is vended
+under the workloads OU.
+
+**What moves and what does not.** Parameter Store and the role that reads it are
+in `sbhi-homelab`. `cert-manager`'s role stays in `sbhi-shared-services` because
+it acts on Route53, and DNS is a shared-services concern by decision 14. The
+split is per resource, not per workload.
+
+**The second OIDC provider is not a second trust chain.** The issuer is one
+public HTTPS endpoint with one signing key and one discovery document, all
+unchanged. `aws_iam_openid_connect_provider` is account-scoped, so each account
+that trusts the issuer registers its own pointer at it. Nothing is duplicated
+except that pointer.
+
+**State.** By [decision 15](#15-state-follows-the-repository-that-writes-it-not-the-account-it-describes),
+workload state stays with the workload repository: the new root module keeps its
+state in `sbhi-homelab-tfstate`, alongside the other homelab stacks. Its backend
+authenticates as `sbhi-shared-services` through an explicit `profile` while its
+provider targets `sbhi-homelab`, the same split `environments/shared-services/`
+already uses. No new bucket, which would reopen
+[decision 1](#1-bootstrap-state-is-local-and-manual) a third time and is not
+worth it below the four or five accounts decision 15 names.
+
+**Alternative considered:** keeping the parameters in `sbhi-shared-services`,
+where the cluster's AWS footprint already is.
+
+**Why rejected:** shared services holds what several consumers share, and DNS
+qualifies. Application secrets belong to one workload and follow it. Putting
+them in a shared account means every future consumer of that account is inside
+the blast radius of the cluster's credentials.
