@@ -16,6 +16,9 @@ management_account_id = "000000000000"
 # replaces the account, so prefer an alias you control (e.g. a distribution list).
 shared_services_email = "aws-shared-services@example.com"
 
+# Root email of the homelab workload account. Same constraints as above.
+homelab_email = "aws-homelab@example.com"
+
 ## Identity Center
 
 # Email of the Identity Center admin user. Receives the password-setup
